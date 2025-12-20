@@ -34,46 +34,10 @@ COPY .yarnrc.yml* ./
 COPY packages/backend/package.json ./packages/backend/
 COPY packages/app/package.json ./packages/app/
 
-# Installer les dépendances (yarn est préféré car yarn.lock existe)
-# isolated-vm peut échouer - on utilise une résolution pour le remplacer par un stub
+# Installer les dépendances
+# Node.js 20 devrait permettre à isolated-vm de compiler correctement
 RUN if [ -f yarn.lock ]; then \
-      echo "Installing dependencies..."; \
-      # Essayer d'abord avec frozen-lockfile
-      yarn install --frozen-lockfile --network-timeout 100000 2>&1 | tee /tmp/yarn.log || \
-      YARN_FAILED=true; \
-      if [ "${YARN_FAILED:-false}" = "true" ]; then \
-        echo "⚠️  Installation with frozen-lockfile failed"; \
-        if grep -q "isolated-vm.*couldn't be built" /tmp/yarn.log 2>/dev/null; then \
-          echo "⚠️  isolated-vm failed, trying without frozen-lockfile..."; \
-          # Réessayer sans frozen-lockfile - yarn pourra peut-être résoudre sans isolated-vm
-          yarn install --network-timeout 100000 2>&1 | tee /tmp/yarn2.log || \
-          (echo "⚠️  Second attempt failed, but checking if installation partially succeeded..."; \
-           # Vérifier si yarn a créé des fichiers malgré l'erreur
-           if [ -f ".yarn/cache" ] || [ -d ".pnp.cjs" ] || [ -d "node_modules" ]; then \
-             echo "✅ Some yarn files created, installation may have partially succeeded"; \
-           else \
-             echo "❌ No yarn files created, installation completely failed"; \
-             echo "Last 30 lines of yarn log:"; \
-             tail -30 /tmp/yarn2.log; \
-             exit 1; \
-           fi); \
-        else \
-          echo "❌ Unknown error during installation"; \
-          tail -30 /tmp/yarn.log; \
-          exit 1; \
-        fi; \
-      fi; \
-      # Vérifier que l'installation a réussi (yarn 4 utilise .pnp.cjs ou node_modules selon config)
-      if [ -f ".yarnrc.yml" ] && grep -q "nodeLinker: node-modules" .yarnrc.yml; then \
-        if [ ! -d "node_modules" ] || [ ! -d "node_modules/@backstage" ]; then \
-          echo "❌ node_modules not properly created"; \
-          exit 1; \
-        fi; \
-      elif [ ! -f ".pnp.cjs" ] && [ ! -d "node_modules" ]; then \
-        echo "❌ No yarn installation files found"; \
-        exit 1; \
-      fi; \
-      echo "✅ Dependencies installed successfully"; \
+      yarn install --frozen-lockfile; \
     elif [ -f package-lock.json ]; then \
       npm ci; \
     else \
