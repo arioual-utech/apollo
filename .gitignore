@@ -1,38 +1,56 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
-
-# Testing
-coverage/
-
-# Production
-dist/
-build/
-
-# Misc
+# macOS
 .DS_Store
-*.pem
 
-# Debug
+# Logs
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Local env files
+# Coverage directory generated when running tests with coverage
+coverage
+
+# Dependencies
+node_modules/
+
+# Yarn files
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Node version directives
+.nvmrc
+
+# dotenv environment variables file
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.test
 
-# IDEs
-.idea/
-.vscode/
+# Build output
+dist
+dist-types
+
+# Temporary change files created by Vim
 *.swp
-*.swo
-*~
 
-# OS
-Thumbs.db
+# MkDocs build output
+site
 
+# Local configuration files
+*.local.yaml
+
+# Sensitive credentials
+*-credentials.yaml
+
+# vscode database functionality support files
+*.session.sql
+
+# E2E test reports
+e2e-test-report/
+
+# Cache
+.cache/

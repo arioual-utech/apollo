@@ -37,6 +37,9 @@ COPY --from=build /app/packages/backend/dist ./dist
 COPY --from=build /app/packages/backend/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages/backend/src ./src
+# Copier les fichiers de configuration
+COPY --from=build /app/app-config.production.yaml ./app-config.production.yaml
+COPY --from=build /app/app-config.yaml ./app-config.yaml
 
 # Créer un utilisateur non-root
 RUN useradd -m -u 1000 backstage && \
