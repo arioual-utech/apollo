@@ -35,9 +35,16 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/app/package.json ./packages/app/
 
 # Installer les dépendances
-# Node.js 20 devrait permettre à isolated-vm de compiler correctement
+# Exclure isolated-vm qui ne compile pas dans Docker
 RUN if [ -f yarn.lock ]; then \
-      yarn install --frozen-lockfile; \
+      echo "Excluding isolated-vm from yarn.lock (doesn't compile in Docker)..."; \
+      # Créer un yarn.lock modifié sans isolated-vm
+      awk 'BEGIN{skip=0} /^"isolated-vm@/{skip=1} /^"[^i]/{skip=0} skip==0{print}' yarn.lock > yarn.lock.tmp && \
+      mv yarn.lock.tmp yarn.lock; \
+      # Supprimer aussi les références dans les dépendances
+      sed -i '/isolated-vm/d' yarn.lock; \
+      echo "Installing dependencies (isolated-vm excluded)..."; \
+      yarn install --frozen-lockfile || yarn install; \
     elif [ -f package-lock.json ]; then \
       npm ci; \
     else \
