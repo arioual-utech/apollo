@@ -35,47 +35,38 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/app/package.json ./packages/app/
 
 # Installer les dépendances (yarn est préféré car yarn.lock existe)
-# isolated-vm peut échouer - on utilise une approche en deux étapes :
-# 1. Installer sans builder les packages natifs problématiques
-# 2. Builder manuellement les packages nécessaires
+# isolated-vm peut échouer - on essaie d'abord avec frozen-lockfile, puis sans si nécessaire
 RUN if [ -f yarn.lock ]; then \
-      # Créer un script temporaire pour builder seulement les packages nécessaires
-      echo '#!/bin/sh' > /tmp/build-native.sh && \
-      echo 'set -e' >> /tmp/build-native.sh && \
-      echo 'if [ -d "node_modules/better-sqlite3" ]; then' >> /tmp/build-native.sh && \
-      echo '  cd node_modules/better-sqlite3 && npm run build || npm run install || true && cd -' >> /tmp/build-native.sh && \
-      echo 'fi' >> /tmp/build-native.sh && \
-      chmod +x /tmp/build-native.sh; \
-      # Essayer d'abord avec frozen-lockfile
+      set +e; \
       echo "Installing dependencies with frozen-lockfile..."; \
-      yarn install --frozen-lockfile --network-timeout 100000 2>&1 | tee /tmp/yarn.log || \
-      YARN_FAILED=true; \
-      if [ "${YARN_FAILED:-false}" = "true" ]; then \
-        echo "⚠️  Installation with frozen-lockfile failed"; \
+      yarn install --frozen-lockfile --network-timeout 100000 > /tmp/yarn.log 2>&1; \
+      YARN_EXIT=$?; \
+      if [ $YARN_EXIT -ne 0 ]; then \
+        echo "⚠️  Installation with frozen-lockfile failed (exit code: $YARN_EXIT)"; \
         if grep -q "isolated-vm.*couldn't be built" /tmp/yarn.log 2>/dev/null; then \
-          echo "⚠️  isolated-vm failed (non-critical), installing without it..."; \
-          # Modifier temporairement le yarn.lock pour exclure isolated-vm
-          # Ou simplement réessayer sans frozen-lockfile
-          yarn install --network-timeout 100000 2>&1 | tee /tmp/yarn2.log; \
-          YARN2_EXIT=${PIPESTATUS[0]}; \
+          echo "⚠️  isolated-vm failed (non-critical), retrying without frozen-lockfile..."; \
+          yarn install --network-timeout 100000 > /tmp/yarn2.log 2>&1; \
+          YARN2_EXIT=$?; \
           if [ $YARN2_EXIT -ne 0 ]; then \
-            echo "⚠️  Second attempt also failed, but checking if node_modules exists..."; \
+            echo "⚠️  Second attempt also failed (exit code: $YARN2_EXIT)"; \
+            echo "Checking if node_modules exists despite errors..."; \
             if [ -d "node_modules" ] && [ -d "node_modules/@backstage" ]; then \
-              echo "✅ node_modules exists despite errors, continuing..."; \
+              echo "✅ node_modules exists, continuing despite errors..."; \
             else \
-              echo "❌ node_modules not created, cannot continue"; \
+              echo "❌ node_modules not created"; \
+              echo "Last 50 lines of yarn log:"; \
+              tail -50 /tmp/yarn2.log; \
               exit 1; \
             fi; \
           fi; \
         else \
           echo "❌ Unknown error during installation"; \
-          cat /tmp/yarn.log; \
+          echo "Last 50 lines of yarn log:"; \
+          tail -50 /tmp/yarn.log; \
           exit 1; \
         fi; \
       fi; \
-      # Builder manuellement better-sqlite3 si nécessaire
-      /tmp/build-native.sh || true; \
-      # Vérifier que node_modules existe et contient les packages critiques
+      set -e; \
       if [ ! -d "node_modules" ] || [ ! -d "node_modules/@backstage" ]; then \
         echo "❌ node_modules not properly created"; \
         exit 1; \
