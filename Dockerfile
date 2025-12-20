@@ -4,11 +4,13 @@ WORKDIR /app
 
 # Installer les dépendances système nécessaires pour compiler les packages natifs
 # build-essential inclut gcc, g++, make, libc6-dev
+# isolated-vm nécessite des headers C++ supplémentaires
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     build-essential \
     git \
     pkg-config \
+    libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Stage de build
@@ -17,21 +19,23 @@ FROM base AS build
 # Installer yarn globalement
 RUN corepack enable && corepack prepare yarn@stable --activate
 
+# Variables d'environnement pour aider la compilation des packages natifs
+ENV PYTHON=python3
+ENV npm_config_build_from_source=true
+
 # Copier les fichiers de configuration des packages
 COPY package.json yarn.lock* package-lock.json* ./
 COPY packages/backend/package.json ./packages/backend/
 COPY packages/app/package.json ./packages/app/
 
 # Installer les dépendances (yarn est préféré car yarn.lock existe)
-# Augmenter le timeout réseau et permettre de continuer même si certains packages optionnels échouent
+# Note: isolated-vm peut échouer à compiler mais yarn continuera avec les autres packages
 RUN if [ -f yarn.lock ]; then \
-      yarn install --frozen-lockfile --network-timeout 100000 || \
-      (echo "⚠️  Some packages failed, retrying with optional dependencies ignored..." && \
-       yarn install --frozen-lockfile --network-timeout 100000 --ignore-optional); \
+      yarn install --frozen-lockfile --network-timeout 100000; \
     elif [ -f package-lock.json ]; then \
-      npm ci || npm ci --ignore-optional; \
+      npm ci; \
     else \
-      npm install || npm install --ignore-optional; \
+      npm install; \
     fi
 
 # Copier le reste du code source
