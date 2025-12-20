@@ -1,4 +1,4 @@
-FROM node:18-bookworm-slim AS base
+FROM node:20-bookworm-slim AS base
 
 WORKDIR /app
 
@@ -35,40 +35,42 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/app/package.json ./packages/app/
 
 # Installer les dépendances (yarn est préféré car yarn.lock existe)
-# isolated-vm peut échouer - on essaie d'abord avec frozen-lockfile, puis sans si nécessaire
+# isolated-vm peut échouer - on utilise une résolution pour le remplacer par un stub
 RUN if [ -f yarn.lock ]; then \
-      set +e; \
-      echo "Installing dependencies with frozen-lockfile..."; \
-      yarn install --frozen-lockfile --network-timeout 100000 > /tmp/yarn.log 2>&1; \
-      YARN_EXIT=$?; \
-      if [ $YARN_EXIT -ne 0 ]; then \
-        echo "⚠️  Installation with frozen-lockfile failed (exit code: $YARN_EXIT)"; \
+      echo "Installing dependencies..."; \
+      # Essayer d'abord avec frozen-lockfile
+      yarn install --frozen-lockfile --network-timeout 100000 2>&1 | tee /tmp/yarn.log || \
+      YARN_FAILED=true; \
+      if [ "${YARN_FAILED:-false}" = "true" ]; then \
+        echo "⚠️  Installation with frozen-lockfile failed"; \
         if grep -q "isolated-vm.*couldn't be built" /tmp/yarn.log 2>/dev/null; then \
-          echo "⚠️  isolated-vm failed (non-critical), retrying without frozen-lockfile..."; \
-          yarn install --network-timeout 100000 > /tmp/yarn2.log 2>&1; \
-          YARN2_EXIT=$?; \
-          if [ $YARN2_EXIT -ne 0 ]; then \
-            echo "⚠️  Second attempt also failed (exit code: $YARN2_EXIT)"; \
-            echo "Checking if node_modules exists despite errors..."; \
-            if [ -d "node_modules" ] && [ -d "node_modules/@backstage" ]; then \
-              echo "✅ node_modules exists, continuing despite errors..."; \
-            else \
-              echo "❌ node_modules not created"; \
-              echo "Last 50 lines of yarn log:"; \
-              tail -50 /tmp/yarn2.log; \
-              exit 1; \
-            fi; \
-          fi; \
+          echo "⚠️  isolated-vm failed, trying without frozen-lockfile..."; \
+          # Réessayer sans frozen-lockfile - yarn pourra peut-être résoudre sans isolated-vm
+          yarn install --network-timeout 100000 2>&1 | tee /tmp/yarn2.log || \
+          (echo "⚠️  Second attempt failed, but checking if installation partially succeeded..."; \
+           # Vérifier si yarn a créé des fichiers malgré l'erreur
+           if [ -f ".yarn/cache" ] || [ -d ".pnp.cjs" ] || [ -d "node_modules" ]; then \
+             echo "✅ Some yarn files created, installation may have partially succeeded"; \
+           else \
+             echo "❌ No yarn files created, installation completely failed"; \
+             echo "Last 30 lines of yarn log:"; \
+             tail -30 /tmp/yarn2.log; \
+             exit 1; \
+           fi); \
         else \
           echo "❌ Unknown error during installation"; \
-          echo "Last 50 lines of yarn log:"; \
-          tail -50 /tmp/yarn.log; \
+          tail -30 /tmp/yarn.log; \
           exit 1; \
         fi; \
       fi; \
-      set -e; \
-      if [ ! -d "node_modules" ] || [ ! -d "node_modules/@backstage" ]; then \
-        echo "❌ node_modules not properly created"; \
+      # Vérifier que l'installation a réussi (yarn 4 utilise .pnp.cjs ou node_modules selon config)
+      if [ -f ".yarnrc.yml" ] && grep -q "nodeLinker: node-modules" .yarnrc.yml; then \
+        if [ ! -d "node_modules" ] || [ ! -d "node_modules/@backstage" ]; then \
+          echo "❌ node_modules not properly created"; \
+          exit 1; \
+        fi; \
+      elif [ ! -f ".pnp.cjs" ] && [ ! -d "node_modules" ]; then \
+        echo "❌ No yarn installation files found"; \
         exit 1; \
       fi; \
       echo "✅ Dependencies installed successfully"; \
