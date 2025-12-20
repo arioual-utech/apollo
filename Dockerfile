@@ -2,12 +2,13 @@ FROM node:18-bookworm-slim AS base
 
 WORKDIR /app
 
-# Installer les dépendances système
+# Installer les dépendances système nécessaires pour compiler les packages natifs
+# build-essential inclut gcc, g++, make, libc6-dev
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    make \
-    g++ \
+    build-essential \
     git \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Stage de build
@@ -22,12 +23,15 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/app/package.json ./packages/app/
 
 # Installer les dépendances (yarn est préféré car yarn.lock existe)
+# Augmenter le timeout réseau et permettre de continuer même si certains packages optionnels échouent
 RUN if [ -f yarn.lock ]; then \
-      yarn install --frozen-lockfile; \
+      yarn install --frozen-lockfile --network-timeout 100000 || \
+      (echo "⚠️  Some packages failed, retrying with optional dependencies ignored..." && \
+       yarn install --frozen-lockfile --network-timeout 100000 --ignore-optional); \
     elif [ -f package-lock.json ]; then \
-      npm ci; \
+      npm ci || npm ci --ignore-optional; \
     else \
-      npm install; \
+      npm install || npm install --ignore-optional; \
     fi
 
 # Copier le reste du code source
