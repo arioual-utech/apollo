@@ -29,33 +29,37 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/app/package.json ./packages/app/
 
 # Installer les dépendances (yarn est préféré car yarn.lock existe)
-# isolated-vm peut échouer mais n'est pas critique - on continue même si yarn échoue partiellement
-RUN set +e; \
-    if [ -f yarn.lock ]; then \
-      yarn install --frozen-lockfile --network-timeout 100000 2>&1 | tee /tmp/yarn.log; \
-      YARN_EXIT=$?; \
-      if [ $YARN_EXIT -ne 0 ]; then \
-        echo "⚠️  Yarn installation had errors, checking logs..."; \
-        if grep -q "isolated-vm.*couldn't be built" /tmp/yarn.log; then \
-          echo "⚠️  isolated-vm failed to build (this is often non-critical)"; \
-          # Vérifier si les packages critiques sont installés
-          if [ -d "node_modules/better-sqlite3" ] && [ -d "node_modules/@backstage" ]; then \
-            echo "✅ Critical packages are installed, continuing..."; \
-          else \
-            echo "❌ Critical packages missing, build cannot continue"; \
-            exit 1; \
-          fi; \
+# isolated-vm peut échouer - on réessaie sans frozen-lockfile pour permettre à yarn de continuer
+RUN if [ -f yarn.lock ]; then \
+      # Essayer d'abord avec frozen-lockfile
+      echo "Installing dependencies with frozen-lockfile..."; \
+      yarn install --frozen-lockfile --network-timeout 100000 2>&1 | tee /tmp/yarn.log || \
+      YARN_FAILED=true; \
+      if [ "${YARN_FAILED:-false}" = "true" ]; then \
+        echo "⚠️  Installation with frozen-lockfile failed"; \
+        if grep -q "isolated-vm.*couldn't be built" /tmp/yarn.log 2>/dev/null; then \
+          echo "⚠️  isolated-vm failed (non-critical), retrying without frozen-lockfile..."; \
+          # Réessayer sans frozen-lockfile - yarn pourra peut-être continuer
+          yarn install --network-timeout 100000 || \
+          (echo "❌ Installation failed even without frozen-lockfile" && exit 1); \
         else \
           echo "❌ Unknown error during installation"; \
           exit 1; \
         fi; \
       fi; \
+      # Vérifier que node_modules existe et contient les packages critiques
+      if [ ! -d "node_modules" ] || [ ! -d "node_modules/@backstage" ]; then \
+        echo "❌ node_modules not properly created"; \
+        echo "Attempting final install without frozen-lockfile..."; \
+        yarn install --network-timeout 100000 || \
+        (echo "❌ Final installation attempt failed" && exit 1); \
+      fi; \
+      echo "✅ Dependencies installed successfully"; \
     elif [ -f package-lock.json ]; then \
       npm ci; \
     else \
       npm install; \
-    fi; \
-    set -e
+    fi
 
 # Copier le reste du code source
 COPY . .
