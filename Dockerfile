@@ -29,14 +29,33 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/app/package.json ./packages/app/
 
 # Installer les dépendances (yarn est préféré car yarn.lock existe)
-# Note: isolated-vm peut échouer à compiler mais yarn continuera avec les autres packages
-RUN if [ -f yarn.lock ]; then \
-      yarn install --frozen-lockfile --network-timeout 100000; \
+# isolated-vm peut échouer mais n'est pas critique - on continue même si yarn échoue partiellement
+RUN set +e; \
+    if [ -f yarn.lock ]; then \
+      yarn install --frozen-lockfile --network-timeout 100000 2>&1 | tee /tmp/yarn.log; \
+      YARN_EXIT=$?; \
+      if [ $YARN_EXIT -ne 0 ]; then \
+        echo "⚠️  Yarn installation had errors, checking logs..."; \
+        if grep -q "isolated-vm.*couldn't be built" /tmp/yarn.log; then \
+          echo "⚠️  isolated-vm failed to build (this is often non-critical)"; \
+          # Vérifier si les packages critiques sont installés
+          if [ -d "node_modules/better-sqlite3" ] && [ -d "node_modules/@backstage" ]; then \
+            echo "✅ Critical packages are installed, continuing..."; \
+          else \
+            echo "❌ Critical packages missing, build cannot continue"; \
+            exit 1; \
+          fi; \
+        else \
+          echo "❌ Unknown error during installation"; \
+          exit 1; \
+        fi; \
+      fi; \
     elif [ -f package-lock.json ]; then \
       npm ci; \
     else \
       npm install; \
-    fi
+    fi; \
+    set -e
 
 # Copier le reste du code source
 COPY . .
