@@ -13,19 +13,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Stage de build
 FROM base AS build
 
+# Installer yarn globalement
+RUN corepack enable && corepack prepare yarn@stable --activate
+
 # Copier les fichiers de configuration des packages
 COPY package.json yarn.lock* package-lock.json* ./
 COPY packages/backend/package.json ./packages/backend/
 COPY packages/app/package.json ./packages/app/
 
-# Installer les dépendances (en utilisant yarn ou npm selon votre setup)
-RUN yarn install --frozen-lockfile || npm ci
+# Installer les dépendances (yarn est préféré car yarn.lock existe)
+RUN if [ -f yarn.lock ]; then \
+      yarn install --frozen-lockfile; \
+    elif [ -f package-lock.json ]; then \
+      npm ci; \
+    else \
+      npm install; \
+    fi
 
 # Copier le reste du code source
 COPY . .
 
 # Builder l'application backend
-RUN yarn build:backend || npm run build:backend
+RUN if [ -f yarn.lock ]; then \
+      yarn build:backend; \
+    else \
+      npm run build:backend; \
+    fi
 
 # Stage de production
 FROM base AS production
