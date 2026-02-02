@@ -47,13 +47,16 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Rollout ArgoCD app backstage
+      - name: Rollout ArgoCD app apollo
         env:
           ARGO_SERVER: https://themis.olymp.ovh
           ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_API_TOKEN }}
         run: |
           curl -s -k -H "Authorization: Bearer ${ARGOCD_AUTH_TOKEN}" \
-            -X POST "${ARGO_SERVER}/api/v1/applications/backstage/sync" \
+            -X POST "${ARGO_SERVER}/api/v1/applications/apollo/sync" \
             -H 'Content-Type: application/json' \
             -d '{"prune":false,"dryRun":false,"strategy":{"hook":{"force":true}}}'
+
+
+
 
