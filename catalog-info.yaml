@@ -1,0 +1,30 @@
+# Catalogue Backstage pour Apollo (IDP). Chargé via raw URL.
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: arioual-utech
+  description: Utilisateur principal (GitHub)
+spec:
+  profile:
+    displayName: arioual
+  memberOf: [team-platform]
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: team-platform
+  description: Équipe plateforme
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: olympe
+  description: Infra Olympe (ArgoCD, Vault, Apollo, etc.)
+spec:
+  type: website
+  lifecycle: production
+  owner: team-platform
