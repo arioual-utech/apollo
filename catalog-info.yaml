@@ -24,6 +24,9 @@ kind: Component
 metadata:
   name: olympe
   description: Infra Olympe (ArgoCD, Vault, Apollo, etc.)
+  annotations:
+    # Affiche dans l’onglet CD toutes les applications Argo CD dont le label part-of=olympe.
+    argocd/app-selector: app.kubernetes.io/part-of=olympe
 spec:
   type: website
   lifecycle: production
