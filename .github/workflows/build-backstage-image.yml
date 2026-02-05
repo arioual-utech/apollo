@@ -24,11 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # isolated-vm (scaffolder) ne compile ni sur Node 20.x (v8::SourceLocation). Build avec Node 18.
+      # isolated-vm 6.0.2 fournit des prebuilds pour Node 22/24 (v127/v137) uniquement. Avec 18/20, compilation source → erreur v8::SourceLocation.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18.20.0"
+          node-version: "22"
           cache: "yarn"
           cache-dependency-path: ${{ env.APP_DIR }}/yarn.lock
 
@@ -37,8 +37,6 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
-        env:
-          YARN_IGNORE_NODE: 1
         run: yarn install --immutable
 
       - name: Generate type definitions
