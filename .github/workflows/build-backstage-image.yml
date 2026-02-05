@@ -1,5 +1,5 @@
 # Build image Backstage custom (SignInPage GitHub) et push vers GHCR.
-# Prérequis : app Backstage dans ce repo (npx @backstage/create-app), SignInPage modifiée, Dockerfile dans packages/backend/.
+# L’app Backstage est dans le sous-dossier apollo/ (sortie de create-app).
 
 name: Build Backstage image
 
@@ -11,6 +11,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/apollo-backstage
+  APP_DIR: apollo
 
 jobs:
   build:
@@ -28,17 +29,21 @@ jobs:
         with:
           node-version: "20"
           cache: "yarn"
+          cache-dependency-path: ${{ env.APP_DIR }}/yarn.lock
 
       - name: Enable Corepack (Yarn)
         run: corepack enable && corepack prepare yarn@stable --activate
 
       - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
         run: yarn install --immutable
 
       - name: Generate type definitions
+        working-directory: ${{ env.APP_DIR }}
         run: yarn tsc
 
       - name: Build backend
+        working-directory: ${{ env.APP_DIR }}
         run: yarn build:backend
 
       - name: Set up Docker Buildx
@@ -63,8 +68,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: packages/backend/Dockerfile
+          context: ${{ env.APP_DIR }}
+          file: ${{ env.APP_DIR }}/packages/backend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
