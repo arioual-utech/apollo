@@ -24,11 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # isolated-vm (scaffolder) ne compile pas avec Node 20.20+ (changement API V8). On fixe 20.18.
+      # isolated-vm (scaffolder) ne compile ni sur Node 20.x (v8::SourceLocation). Build avec Node 18.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.18.0"
+          node-version: "18.20.0"
           cache: "yarn"
           cache-dependency-path: ${{ env.APP_DIR }}/yarn.lock
 
@@ -37,6 +37,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
+        env:
+          YARN_IGNORE_NODE: 1
         run: yarn install --immutable
 
       - name: Generate type definitions
