@@ -1,33 +1,36 @@
-# Catalogue Backstage pour Apollo (IDP). Chargé via raw URL.
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform
+  description: Équipe plateforme Olympe
+spec:
+  type: team
+  profile:
+    displayName: Platform
+    email: platform@olymp.ovh
+  children: []
 ---
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
   name: arioual-utech
-  description: Utilisateur principal (GitHub)
+  description: Utilisateur Apollo
 spec:
   profile:
-    displayName: arioual
-  memberOf: [team-platform]
+    displayName: Adrien RIOUAL
+    email: adrien.rioual@gmail.com
+  memberOf: [platform]
 ---
-apiVersion: backstage.io/v1alpha1
-kind: Group
-metadata:
-  name: team-platform
-  description: Équipe plateforme
-spec:
-  type: team
-  children: []
----
+# Exemple de composant (optionnel) : le projet olympe
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: olympe
-  description: Infra Olympe (ArgoCD, Vault, Apollo, etc.)
-  annotations:
-    # Affiche dans l’onglet CD toutes les applications Argo CD dont le label part-of=olympe.
-    argocd/app-selector: app.kubernetes.io/part-of=olympe
+  description: App of apps et sources Olympe
+  tags:
+    - argocd
+    - platform
 spec:
   type: website
   lifecycle: production
-  owner: team-platform
+  owner: platform
